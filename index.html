@@ -112,7 +112,8 @@ z-index: 1000;
 <div class="btnrow">
   <button id="fullscreen-btn">Enter Fullscreen to Continue</button>
 </div>
-<p class="muted">⚠️ <strong>You must stay in full-screen during this entire session. Exiting full-screen or navigating away from this window will end the video and the quiz immediately</strong>. You have only <span style="font-weight:700; color:#b91c1c;">one attempt</span> at answering this quiz.</p>
+<!-- <p class="muted">⚠️ <strong>You must stay in full-screen during this entire session. Exiting full-screen or navigating away from this window will end the video and the quiz immediately</strong>. You have only <span style="font-weight:700; color:#b91c1c;">one attempt</span> at answering this quiz.</p> -->
+<p class="muted">⚠️ <strong>You must stay in full-screen during this entire session. Exiting <span style="font-weight:700; color:#b91c1c;">full-screen</span> or <span style="font-weight:700; color:#b91c1c;">navigating away from this window </span> will end the video and the quiz immediately</strong>. You have only <span style="font-weight:700; color:#b91c1c;">one attempt</span> at answering this quiz.</p>
 </div>
 <div id="screen-id" class="card hidden">
 <h2>Please input your Andrew ID</h2>
@@ -211,7 +212,7 @@ z-index: 1000;
 <script>
 
 /*** === CONFIG === ***/
-const LOGGER_URL = "https://script.google.com/macros/s/AKfycbwRlP7EBVCbeIQwNMp0Y4jVg81GSeH3MWSBAlAZWbeKQtxKWSGQwZIKTj1sX7QLPYp4/exec";
+const LOGGER_URL = "https://script.google.com/macros/s/AKfycbyG82KVpQI4wukgNeXa-SQ-UqwGPnM3V_HWZzflHeNC21vksID9LAo6LfKxXenZS6PL/exec";
 const MAX_VIDEO_MINUTES = 20000;
 
 // Video URLs for random assignment
