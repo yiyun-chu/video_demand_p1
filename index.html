@@ -212,12 +212,12 @@ z-index: 1000;
 <script>
 
 /*** === CONFIG === ***/
-const LOGGER_URL = "https://script.google.com/macros/s/AKfycbw1nBO7mxjctlhHx0B7Batn7Uq3BDrxgdfRqELSpesih3XcXzH6h_pIqR1ETi0xBWWB/exec";
+const LOGGER_URL = "https://script.google.com/macros/s/AKfycbxW6dbZzcvzlefQADU89XDme2xOi76rEEkhqJIqM-zFysEY4C55gtoKBTlBUVi16BJI/exec";
 const MAX_VIDEO_MINUTES = 20000;
 
 // Video URLs for random assignment
-const VIDEO_A_URL = "https://www.dropbox.com/scl/fi/013xinrni3awibj87hoh7/network.mp4?rlkey=m7ezusxiqyv77kofbmxr51u2b&st=yphpxhpj&raw=1";
-const VIDEO_B_URL = "https://www.dropbox.com/scl/fi/p5osu3sxg2me61q9w5s5h/NETWORKS_part_1.mp4?rlkey=wihqk1eqoaj4faotpy58na4bt&st=umde0bwl&raw=1";
+const VIDEO_A_URL = "https://www.dropbox.com/scl/fi/641z8xkty3zeu9mtvvf0j/demand_p1.mp4?rlkey=c1ki8eba642kujahctmulvt6z&st=dgite4tg&raw=1";
+const VIDEO_B_URL = "https://www.dropbox.com/scl/fi/get7g0ikafpnxt2ybpn66/DEMAND_P1_part_1.mp4?rlkey=hepbu5nzzbuf9l2h96azd7m97&st=cwdv7vq5&raw=1";
 
 
 /*** === STATE & UTIL === ***/
@@ -226,6 +226,7 @@ let participantId = '';
 let initialTreatmentGroup = -1;
 let treatmentGroup = -1;
 let attemptIndex = 0;
+let isRetake = false; // ***FIX***: New variable to track the sub-stage within one attempt
 let postQuizScore = 0;
 let attempt1Score = -1;
 let page = 'intro';
@@ -596,24 +597,19 @@ async function verifyAndSetState() {
     clearInterval(interval);
     bar.style.width = "100%";
     setTimeout(() => {
+      // ***FIX***: Reworked logic to handle any attempt number from the server
       if (result.blocked) {
         show('screen-blocked');
         enterPage('blocked');
       } else {
+        // This block now correctly initializes the state for any new attempt (1, 2, 3...)
         initialTreatmentGroup = parseInt(result.treatment, 10);
-        let currentAttemptFromServer = parseInt(result.currentAttempt, 10);
-        if (currentAttemptFromServer === 1) {
-             attemptIndex = 1;
-             treatmentGroup = initialTreatmentGroup;
-        } else if (currentAttemptFromServer === 2) {
-             attemptIndex = 2;
-             treatmentGroup = 1 - initialTreatmentGroup;
-        } else {
-             show('screen-blocked');
-             enterPage('blocked');
-             return;
-        }
+        attemptIndex = parseInt(result.currentAttempt, 10); // Set current attempt from server
+        isRetake = false; // Reset the retake status for the new attempt
+        treatmentGroup = initialTreatmentGroup; // Always start with the initial treatment
+
         console.log(`Initial T: ${initialTreatmentGroup}, Current Attempt: ${attemptIndex}, Used T: ${treatmentGroup}`);
+        
         generateQuizzes();
         renderQuiz('pre-quiz', preQuestions);
         renderQuiz('post-quiz', postQuestions);
@@ -668,7 +664,8 @@ document.getElementById('to-grade-prompt').addEventListener('click', () => {
     postQuizScore = correct;
     logEvent('post-quiz-complete', { score: correct, total: total });
     
-    if (attemptIndex === 1) {
+    // ***FIX***: Changed logic to use `isRetake` flag instead of `attemptIndex`
+    if (!isRetake) { // This is the FIRST part of the current attempt.
         attempt1Score = postQuizScore;
         document.getElementById('grade-display-x').textContent = attempt1Score;
         document.getElementById('total-q-1').textContent = total;
@@ -678,15 +675,12 @@ document.getElementById('to-grade-prompt').addEventListener('click', () => {
         
         document.getElementById('attempt-status-1').classList.remove('hidden');
         document.getElementById('attempt-status-2').classList.add('hidden');
-    } else if (attemptIndex === 2) {
+    } else { // This is the SECOND (retake) part of the current attempt.
         document.getElementById('grade-display-y').textContent = postQuizScore;
         document.getElementById('total-q-2').textContent = total;
         
-        // ======================= START: FORMATTING FIX =======================
-        // This rounds the number to a maximum of 2 decimal places, removing trailing zeros.
         const rawFinalGrade = Math.max(attempt1Score, (attempt1Score + postQuizScore) / 2);
         const finalGrade = Math.round(rawFinalGrade * 100) / 100;
-        // ======================== END: FORMATTING FIX ========================
 
         document.getElementById('attempt1-score-display').textContent = attempt1Score;
         document.getElementById('attempt2-score').textContent = postQuizScore;
@@ -703,26 +697,25 @@ document.getElementById('to-grade-prompt').addEventListener('click', () => {
 });
 
 document.getElementById('prompt-yes').addEventListener('click', () => {
+    // ***FIX***: Reworked logic to handle retake as a continuation, not a new session/attempt
     logEvent('retake-accepted', { 
-        attempt: 1, 
+        attempt: attemptIndex, // Log the correct server-side attempt number
         scoreX: attempt1Score, 
         currentTreatment: treatmentGroup,
         nextTreatment: 1 - treatmentGroup
     });
     
-    // === ADDED: Log score for attempt 1 when retaking ===
     logEvent('quiz-score', { score: attempt1Score });
-    
     logEvent('attempt-1-checkpoint', { score: attempt1Score });
     clearTimeout(batchTimer);
     sendBatch();
     
-    sessionId = crypto.randomUUID(); 
-    sessionStartTime = Date.now();
-    eventCounter = 0;
-    attemptIndex = 2;
-    treatmentGroup = 1 - initialTreatmentGroup;
-    
+    // --- Start of modifications ---
+    isRetake = true; // Set the flag to indicate this is the second part of the flow.
+    treatmentGroup = 1 - initialTreatmentGroup; // Switch treatment group for the retake.
+    // DO NOT reset session, startTime, eventCounter, or attemptIndex. This is a continuation.
+    // --- End of modifications ---
+
     generateQuizzes();
     renderQuiz('post-quiz', postQuestions);
     clearAllQuizAnswers();
@@ -730,7 +723,7 @@ document.getElementById('prompt-yes').addEventListener('click', () => {
     const videoSrc = (treatmentGroup === 0) ? VIDEO_A_URL : VIDEO_B_URL;
     video.src = videoSrc;
     video.load();
-    logEvent('video-assigned', { treatment: treatmentGroup, src: videoSrc, attempt: 2 });
+    logEvent('video-assigned', { treatment: treatmentGroup, src: videoSrc, attempt: attemptIndex, isRetake: true });
     
     show('screen-video');
     enterPage('video-retake');
@@ -739,8 +732,6 @@ document.getElementById('prompt-yes').addEventListener('click', () => {
 
 document.getElementById('prompt-no').addEventListener('click', () => {
     logEvent('retake-declined', { attempt: 1, finalScore: attempt1Score });
-
-    // === ADDED: Log score for attempt 1 when declining retake ===
     logEvent('quiz-score', { score: attempt1Score });
 
     generateSurveyQuestions();
@@ -751,8 +742,6 @@ document.getElementById('prompt-no').addEventListener('click', () => {
 
 document.getElementById('to-finish-final').addEventListener('click', () => {
     logEvent('retake-complete', { attempt: 2, scoreY: postQuizScore });
-
-    // === ADDED: Log score for attempt 2 ===
     logEvent('quiz-score', { score: postQuizScore });
 
     generateSurveyQuestions(); 
